@@ -63,6 +63,10 @@ dfs={'model','REQ','pStar',[],'posInit',[],'T','REQ',...
 [model,pStar,posInit,T,L,regPrm,ftrPrm,regModel,pad,verbose,initD] = ...
     getPrmDflt(varargin,dfs,1);
 
+% Is 训练图片
+% pGt 真实形状
+% model 数据集的配置
+% initD arguement过的训练数据集合，参见 initTr 函数
 [regModel,pAll]=rcprTrain1(Is, pGt,model,pStar,posInit,...
         T,L,regPrm,ftrPrm,regModel,pad,verbose,initD);
 end 
@@ -96,13 +100,17 @@ if(verbose),
 end
 tStart = clock;%pCur_t=zeros(N,D,T+1);
 bboxes=posInit(imgIds,:);
+% 开始迭代训练
 for t=t0:T
     % get target value for shape
+    % pCurr 为当前预测到的形状，将其取反加上真实形状得到训练的目标形状（目标形状为相对形状）
     pTar = shapeGt('inverse',model,pCur,bboxes);
     pTar = shapeGt('compose',model,pTar,pGt,bboxes);
     
     if(ftrPrm.type>2)
+        % 生成待选特征点集合
         ftrPos = shapeGt('ftrsGenDup',model,ftrPrm);
+        % 计算所有数据在特征点集合上的特征值（即图像在这个点上的像素值）
         [ftrs,regPrm.occlD] = shapeGt('ftrsCompDup',...
             model,pCur,Is,ftrPos,...
             imgIds,pStar,posInit,regPrm.occlPrm);
@@ -119,10 +127,12 @@ for t=t0:T
     pCur = shapeGt('compose',model,pDel,pCur,bboxes);
     pCur = shapeGt('reprojectPose',model,pCur,bboxes);
     
+    % 保存这一级的预测值
     pAll(:,:,t+1)=pCur(1:N1,:);
     %loss scores
     loss = mean(shapeGt('dist',model,pCur,pGt));
     % store result
+    % 保存结果
     regs(t).regInfo=regInfo;
     regs(t).ftrPos=ftrPos;
     %If stickmen, add part info

@@ -25,8 +25,12 @@ COFW_DIR='./data/';
 trFile=[COFW_DIR 'COFW_train.mat'];
 testFile=[COFW_DIR 'COFW_test.mat'];
 % Load files
+% Is 表示图像
+% bboxes 表示人脸框在图像 Is 中的位置
+% phis 表示特征点在图像 Is 中的位置
 load(trFile,'phisTr','IsTr','bboxesTr');bboxesTr=round(bboxesTr);
 load(testFile,'phisT','IsT','bboxesT');bboxesT=round(bboxesT);
+% nfids 表示特征点个数
 nfids=size(phisTr,2)/3;
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SET UP PARAMETERS
@@ -34,7 +38,12 @@ nfids=size(phisTr,2)/3;
 % cpr_type=1 (reimplementation of Cao et al.)
 % cpr_type=2 RCPR (features+restarts)
 % cpr_type=3 RCPR (full)
-cpr_type=2;
+cpr_type=3;
+
+% 迭代 T 次，每次采用 K 个随机厥
+% 训练时，每个人脸用 L 的形状初始化来训练
+% 测试时用 RT1 个形状来初始化
+% T=100;K=50;L=20;RT1=5;
 if(cpr_type==1)
     %Remove occlusion information
     phisTr=phisTr(:,1:nfids*2);phisT=phisT(:,1:nfids*2);
@@ -74,9 +83,12 @@ elseif(cpr_type==3)
     %RCPR (full) PARAMETERS
     %(type 4, points relative to any 2 landmarks)
     T=100;K=15;L=20;RT1=5;
+    % 设置随机厥参数
+    % 随机产生 400 个特征点
     ftrPrm = struct('type',4,'F',400,'nChn',1,'radius',1.5);
     prm=struct('thrr',[-1 1]/5,'reg',.01);
     %Stot=3 regressors to perform occlusion weighted median
+    % 遮挡相关阐述，将人脸划分为 3x3，采用 Stot=3 个回归器并联预测，结果加权求和
     occlPrm=struct('nrows',3,'ncols',3,'nzones',1,'Stot',3,'th',.5);
     regPrm = struct('type',1,'K',K,'occlPrm',occlPrm,...
         'loss','L2','R',0,'M',5,'model',model,'prm',prm);
@@ -86,6 +98,13 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TRAIN
 %Initialize randomly L shapes per training image
+% pCur arguement过的真实初始形状
+% pGt arguement过的真实形状
+% pGtN arguement过的相对形状
+% pStar 平均相对形状
+% imgIds arguement用到了图片序列
+% N arguement过后的训练样本数
+% N1 真实训练样本数
 [pCur,pGt,pGtN,pStar,imgIds,N,N1]=shapeGt('initTr',...
     IsTr,phisTr,model,[],bboxesTr,L,10);
 initData=struct('pCur',pCur,'pGt',pGt,'pGtN',pGtN,'pStar',pStar,...
@@ -96,6 +115,10 @@ trPrm=struct('model',model,'pStar',[],'posInit',bboxesTr,...
     'pad',10,'verbose',1,'initData',initData);
 %Train model
 [regModel,~] = rcprTrain(IsTr,phisTr,trPrm);
+
+% 保存模型
+tmp = trPrm.regPrm;
+save('./models/rcpr.mat', 'regModel', 'tmp', 'prunePrm');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TEST
 %Initialize randomly using RT1 shapes drawn from training

@@ -56,7 +56,7 @@ dfs={'type',1,'ftrPrm','REQ','K',1,...
 [regType,ftrPrm,K,loss,R,M,model,prm,occlD,occlPrm]=...
     getPrmDflt(varargin,dfs,1);
 %Set base regression type
-switch(regType)
+switch(regType) % 这里全都选择用随机厥 fern
   case 1, regFun = @trainFern;%fern regressor
   case 2, regFun = @trainLin;%linear regressor
   otherwise, error('unknown regressor type');
@@ -95,6 +95,7 @@ for k=1:K
     %Train Stot different regressors
     ysPred = zeros(N,D,Stot); 
     for s=1:Stot
+        % 多级并联预测
         %Select features from correlation score directly
         if(R==0)
             %If occlusion-centered approach, enforce feature variety
@@ -113,10 +114,15 @@ for k=1:K
                 end
             %ow use all features    
             else
+                % 挑选特征点
+                % use 为挑选到的特征点编号
+                % ftrs 为 use 挑选到的特征点对应像素值之差（use[1]-use[2]）
                 [use,ftrs] = selectCorrFeat(M,ysTar,data,...
                   ftrPrm,stdFtrs,dfFtrs);
             end
             %Train regressor using selected features
+            % 利用选择到的特征训练
+            % 得到随机厥输出节点的形状预测增量
             [reg1,ys1]=regFun(ysTar,ftrs,M,prm);
             reg1.fids=use; best={reg1,ys1};
         %Select features using random step optimization            
@@ -152,10 +158,12 @@ for k=1:K
         [regInfo{k,s},ysPred(:,:,s)]=deal(best{:});clear best;
         %If occlusion-centered, get occlusion averages by group
         if(D>10 && Stot>1 && ~isempty(occlD))
+            % 计算这个随机厥用到的所有特征点所在区域的遮挡度之和
             ftrsOccl(:,k,s)=sum(occlD.featOccl(:,regInfo{k,s}.fids),2)./K;
         end
     end
     %Combine S1 regressors to form prediction (Occlusion-centered)
+    % 将 Stot 个回归器的输出联合起来，根据遮挡性加权求和
     if(D>10 && Stot>1 && ~isempty(occlD))
           %(WEIGHTED MEAN)
           %ftrsOccl contains total occlusion of each Regressor
@@ -164,11 +172,12 @@ for k=1:K
           weights=weights./repmat(ss,[1,1,Stot]);
           %when all are fully occluded, all get proportional weight 
           % (regular mean)
+          % 如果每个回归器的遮挡度一样，那就将权值设为平均
           weights(ss==0,1,:)=1/Stot;
           weights=repmat(weights,[1,D,1]);
           %OLD
           for s=1:Stot
-            ysSum=ysSum+ysPred(:,:,s).*weights(:,:,s);
+            ysSum=ysSum+ysPred(:,:,s).*weights(:,:,s); % 加权和
           end
     else 
         %Update output

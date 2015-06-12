@@ -310,6 +310,8 @@ if(ftrData.type==3),
 else
     FTot=ftrData.F;ftrs = zeros(M,FTot);
 end
+% poscs 形状的 x 坐标
+% posrc 形状的 y 坐标
 posrs = phis(:,nfids+1:nfids*2);poscs = phis(:,1:nfids);
 useOccl=occlPrm.Stot>1;
 if(useOccl && (strcmp(model.name,'cofw')))
@@ -338,20 +340,24 @@ for n=1:M
     %where are the features relative to bbox?
     if(useOccl && (strcmp(model.name,'cofw')))
         %to which group (zone) does each feature belong?
+        % 计算每个特征点所在的区域
         occlD.group(n,:)=codifyPos((cs1(n,:)-bboxes(n,1))./bboxes(n,3),...
             (rs1(n,:)-bboxes(n,2))./bboxes(n,4),...
             occlPrm.nrows,occlPrm.ncols);
         %to which group (zone) does each landmark belong?
+        % 计算每个关键点所在的区域
         groupF=codifyPos((poscs(n,:)-bboxes(n,1))./bboxes(n,3),...
             (posrs(n,:)-bboxes(n,2))./bboxes(n,4),...
             occlPrm.nrows,occlPrm.ncols);
         %NEW
         %therefore, what is the occlusion in each group (zone)
+        % 每个区域内关键点的遮挡度之和
         occlAm=zeros(1,nGroups);
         for g=1:nGroups
             occlAm(g)=sum(occl(n,groupF==g));
         end
         %feature occlusion = sum of occlusion on that area
+        % 每个特征点所在的区域的遮挡度
         occlD.featOccl(n,:)=occlAm(occlD.group(n,:));
     end
     
@@ -370,6 +376,7 @@ end
 
 function group=codifyPos(x,y,nrows,ncols)
 %codify position of features into regions
+% 计算特征点所在的区域
 nr=1/nrows;nc=1/ncols;
 %Readjust positions so that they falls in [0,1]
 x=min(1,max(0,x));y=min(1,max(0,y)); 
@@ -393,6 +400,7 @@ function [cs1,rs1]=getLinePoint(FDxs,poscs,posrs)
 %get pixel positions given coordinates as points in a line between
 %landmarks
 %INPUT NxF, OUTPUT NxF
+% 根据直线的两个顶点和中点偏置，计算出特征点
 if(size(poscs,1)==1)%pStar normalized
     l1= FDxs(:,1);l2= FDxs(:,2);xs=FDxs(:,3);
     x1 = poscs(:,l1);y1 = posrs(:,l1);
@@ -590,6 +598,7 @@ end
 
 function phis1=reprojectPose(model,phis,bboxes)
 %reproject shape given bounding box of object location
+% 将相对形状根据矩形框反映射成绝对形状
 [N,D]=size(phis);
 if(strcmp(model.name,'cofw')), nfids = D/3;
 else nfids = D/2;
@@ -608,6 +617,7 @@ end
 
 function phis=projectPose(model,phis,bboxes)
 %project shape onto bounding box of object location
+% 将绝对形状根据矩形框映射成相对形状
 [N,D]=size(phis);
 if(strcmp(model.name,'cofw')), nfids=D/3;
 else nfids=D/2;
@@ -673,22 +683,35 @@ end
 function [pCur,pGt,pGtN,pStar,imgIds,N,N1]=initTr(Is,pGt,...
     model,pStar,posInit,L,pad)
 %Randomly initialize each training image with L shapes
+% Is 图像集合
+% pGt 真实形状
+% model 数据集的配置选择
+% posInit 人脸框在图像中的位置
+% L 每个真实形状配对了形状数，用来做 arguement
+% pad 将人脸矩形框做一定的拓展（扩大）
+% pStar 平均相对形状
+% pGtN 相对形状
 [N,D]=size(pGt);assert(length(Is)==N);
 if(isempty(pStar)),
     [pStar,pGtN]=compPhiStar(model,pGt,Is,pad,[],posInit);
 end
 % augment data amount by random permutations of initial shape
+% pCur 每个真实形状都携带了 L 个初始训练形状
+% pCur.size = [N, D, L]
 pCur=repmat(pGt,[1,1,L]);
+% 暂时只有 cofw 数据集采用了遮挡点方案
 if(strcmp(model.name,'cofw'))
     nfids = size(pGt,2)/3;
 else nfids = size(pGt,2)/2;
 end
 for n=1:N
     %select other images
+    % 从其他形状中选择初始形状
     imgsIds = randSample([1:n-1 n+1:N],L);%[n randSample(1:N,L-1)];
     %Project onto image
     for l=1:L
         %permute bbox location slightly
+        % 稍微扰动人脸框的坐标
         maxDisp = posInit(n,3:4)/16;
         uncert=(2*rand(1,2)-1).*maxDisp;
         bbox=posInit(n,:);bbox(1:2)=bbox(1:2)+uncert;
