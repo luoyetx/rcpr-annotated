@@ -1,3 +1,4 @@
+*.bin
 *.mat
 *.seq
 *.asv
