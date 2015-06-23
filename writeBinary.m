@@ -22,6 +22,10 @@ fwrite(fd, M, 'int32');
 fwrite(fd, featureSize, 'int32');
 fwrite(fd, N, 'int32');
 
+% 写入平均形状
+for i=1:landmarkDim
+    fwrite(fd, regModel.pStar(1, i), 'float32');
+end
 % 写入训练时的形状
 for i=1:N
     for j=1:landmarkDim
