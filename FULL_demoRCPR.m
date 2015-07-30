@@ -19,11 +19,34 @@
 %  If you change path to folder containing training/testing files, change
 %  this variable here:
 COFW_DIR='./data/';
+
+
+% global configure
+dataset_type = 'five'; % cofw, lfpw, five
+cpr_type=2;
+T=100;K=30;L=20;RT1=5;F=20;
+
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LOAD COFW dataset
 % training/testing images and ground truth
-trFile=[COFW_DIR 'COFW_train.mat'];
-testFile=[COFW_DIR 'COFW_test.mat'];
+
+% This should be 'cofw' for 29 landmarks or 'five' for 5 landmarks
+%dataset_type = 'lfw';
+
+if strcmp(dataset_type, 'cofw')
+    trFile=[COFW_DIR 'COFW_train.mat'];
+    testFile=[COFW_DIR 'COFW_test.mat'];
+elseif strcmp(dataset_type, 'five')
+    trFile=[COFW_DIR 'FIVE_train.mat'];
+    testFile=[COFW_DIR 'FIVE_test.mat'];
+elseif strcmp(dataset_type, 'lfpw')
+    trFile=[COFW_DIR 'LFPW_train.mat'];
+    testFile=[COFW_DIR 'LFPW_test.mat'];  
+else
+    dataset_type='cofw';
+    trFile=[COFW_DIR 'COFW_train.mat'];
+    testFile=[COFW_DIR 'COFW_test.mat'];
+end
 % Load files
 % Is 表示图像
 % bboxes 表示人脸框在图像 Is 中的位置
@@ -38,35 +61,39 @@ nfids=size(phisTr,2)/3;
 % cpr_type=1 (reimplementation of Cao et al.)
 % cpr_type=2 RCPR (features+restarts)
 % cpr_type=3 RCPR (full)
-cpr_type=3;
+%cpr_type=2;
 
 % 迭代 T 次，每次采用 K 个随机厥
 % 训练时，每个人脸用 L 的形状初始化来训练
 % 测试时用 RT1 个形状来初始化
 % T=100;K=50;L=20;RT1=5;
 if(cpr_type==1)
+    % 我们不会用到这种类型的特征
     %Remove occlusion information
     phisTr=phisTr(:,1:nfids*2);phisT=phisT(:,1:nfids*2);
     %Create LFPW model (29 landmarks without visibility)
     model = shapeGt('createModel','lfpw');
     %CPR for face PARAMETERS (Cao et al. CVPR12)
     %(type 2, points relative to closest landmark)
-    T=100;K=50;L=20;RT1=5;
-    ftrPrm = struct('type',2,'F',400,'nChn',1,'radius',1);
+    %T=100;K=50;L=20;RT1=5;
+    %ftrPrm = struct('type',2,'F',400,'nChn',1,'radius',1);
+    ftrPrm = struct('type',2,'F',F,'nChn',1,'radius',1);
     prm=struct('thrr',[-1 1]/5,'reg',.01);
     occlPrm=struct('nrows',3,'ncols',3,'nzones',1,'Stot',1,'th',.5);
     regPrm = struct('type',1,'K',K,'occlPrm',occlPrm,...
         'loss','L2','R',0,'M',5,'model',model,'prm',prm);
     prunePrm=struct('prune',0,'maxIter',2,'th',0.1,'tIni',10);
 elseif(cpr_type==2)
+    % 不使用遮挡信息
     %Remove occlusion information
     phisTr=phisTr(:,1:nfids*2);phisT=phisT(:,1:nfids*2);
-    %Create LFPW model (29 landmarks without visibility)
-    model = shapeGt('createModel','lfpw');
+    %Create LFW model (5 landmarks without visibility)
+    model = shapeGt('createModel',dataset_type);
     %RCPR(features+restarts) PARAMETERS
     %(type 4, points relative to any 2 landmarks)
-    T=100;K=50;L=20;RT1=5;
-    ftrPrm = struct('type',4,'F',400,'nChn',1,'radius',1.5);
+    %T=100;K=50;L=20;RT1=5;
+    %ftrPrm = struct('type',4,'F',400,'nChn',1,'radius',1.5);
+    ftrPrm = struct('type',4,'F',F,'nChn',1,'radius',1.5);
     prm=struct('thrr',[-1 1]/5,'reg',.01);
     occlPrm=struct('nrows',3,'ncols',3,'nzones',1,'Stot',1,'th',.5);
     regPrm = struct('type',1,'K',K,'occlPrm',occlPrm,...
@@ -75,17 +102,16 @@ elseif(cpr_type==2)
     prunePrm=struct('prune',1,'maxIter',2,'th',0.1,'tIni',10);
     %remove occlusion information
     phisTr=phisTr(:,1:nfids*2);phisT=phisT(:,1:nfids*2);
-    %Create LFPW model (29 landmarks without visibility)
-    model = shapeGt('createModel','lfpw');
 elseif(cpr_type==3)
     %Create COFW model (29 landmarks including visibility)
-    model = shapeGt('createModel','cofw');
+    model = shapeGt('createModel',dataset_type);
     %RCPR (full) PARAMETERS
     %(type 4, points relative to any 2 landmarks)
-    T=100;K=15;L=20;RT1=5;
+    %T=100;K=15;L=20;RT1=5;
     % 设置随机厥参数
     % 随机产生 400 个特征点
-    ftrPrm = struct('type',4,'F',400,'nChn',1,'radius',1.5);
+    %ftrPrm = struct('type',4,'F',400,'nChn',1,'radius',1.5);
+    ftrPrm = struct('type',4,'F',F,'nChn',1,'radius',1.5);
     prm=struct('thrr',[-1 1]/5,'reg',.01);
     %Stot=3 regressors to perform occlusion weighted median
     % 遮挡相关阐述，将人脸划分为 3x3，采用 Stot=3 个回归器并联预测，结果加权求和
@@ -117,8 +143,8 @@ trPrm=struct('model',model,'pStar',[],'posInit',bboxesTr,...
 [regModel,~] = rcprTrain(IsTr,phisTr,trPrm);
 
 % 保存模型
-tmp = trPrm.regPrm;
-save('./models/rcpr.mat', 'regModel', 'tmp', 'prunePrm');
+regPrm = trPrm.regPrm;
+save('./models/rcpr.mat', 'regModel', 'regPrm', 'prunePrm');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TEST
 %Initialize randomly using RT1 shapes drawn from training

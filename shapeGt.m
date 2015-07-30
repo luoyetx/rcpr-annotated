@@ -73,8 +73,10 @@ switch type
         model.nfids=29;model.D=model.nfids*2; model.name='lfpw';
     case 'helen' % HELEN dataset (194 landmarks: X,Y)
         model.nfids=194;model.D=model.nfids*2;model.name='helen';
-    case 'lfw' % LFW dataset (10 landmarks: X,Y)
-        model.nfids=10;model.D=model.nfids*2; model.name='lfw';
+   case 'lfw' % LFW dataset (10 landmarks: X,Y)
+       model.nfids=10;model.D=model.nfids*2; model.name='lfw';
+    case 'five' % self defined dataset (5 landmarks: X,Y)
+        model.nfids=5;model.D=model.nfids*2; model.name='five';
     case 'pie' %Multi-pie & 300-Faces in the wild dataset (68 landmarks)
         model.nfids=68;model.D=model.nfids*2;model.name='pie';
     case 'apf' %anonimous portrait faces
@@ -563,6 +565,10 @@ elseif(strcmp(model.name,'lfw'))
     leyeX=mean(phis(:,1:2),2);leyeY=mean(phis(:,(1:2)+nfids),2);
     reyeX=mean(phis(:,7:8),2);reyeY=mean(phis(:,(7:8)+nfids),2);
     distPup=sqrt(((leyeX-reyeX).^2) + ((leyeY-reyeY).^2));
+elseif(strcmp(model.name,'five'))
+    leyeX=phis(:,1);leyeY=phis(:,1+nfids);
+    reyeX=phis(:,2);reyeY=phis(:,2+nfids);
+    distPup=sqrt(((leyeX-reyeX).^2) + ((leyeY-reyeY).^2));
 else distPup=0;
 end
 if(nargin<6), bboxes = zeros(N,4); end
@@ -656,6 +662,11 @@ if(strcmp(model.name,'lfpw') || strcmp(model.name,'cofw'))
 elseif(strcmp(model.name,'lfw'))
     leyeX=mean(phis1(:,1:2),2);leyeY=mean(phis1(:,(1:2)+nfids),2);
     reyeX=mean(phis1(:,7:8),2);reyeY=mean(phis1(:,(7:8)+nfids),2);
+    distPup=sqrt(((leyeX-reyeX).^2) + ((leyeY-reyeY).^2));
+    distPup = repmat(distPup,[1,nfids,T]);
+elseif(strcmp(model.name,'five'))
+    leyeX=phis1(:,1);leyeY=phis1(:,1+nfids);
+    reyeX=phis1(:,2);reyeY=phis1(:,2+nfids);
     distPup=sqrt(((leyeX-reyeX).^2) + ((leyeY-reyeY).^2));
     distPup = repmat(distPup,[1,nfids,T]);
 elseif(strcmp(model.name,'helen'))
