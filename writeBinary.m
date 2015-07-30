@@ -7,7 +7,7 @@ fd = fopen(outfile, 'wb'); % overwrite if exists
 
 % 写入模型基本配置
 T = regModel.T;
-[fernSize, regSize] = size(regModel.regs(1).regInfo);
+[regSize, fernSize] = size(regModel.regs(1).regInfo);
 landmarkSize = regModel.model.nfids;
 landmarkDim = regModel.model.D;
 M = size(regModel.regs(1).regInfo{1, 1}.thrs, 2);
@@ -41,10 +41,10 @@ for i=1:T
         fwrite(fd, xs(j, 2)-1, 'int32');
         fwrite(fd, xs(j, 3), 'float32');
     end
-    % 写入随机厥参数 15x3 = 15 + 15 + 15
+    % 写入随机厥参数 15x3
     for r=1:regSize
         for c=1:fernSize
-            reg = regModel.regs(i).regInfo{c, r};
+            reg = regModel.regs(i).regInfo{r, c};
             % 选择的特征编号，分成两行，我们令编号从 0 开始
             for m=1:M
                 fwrite(fd, reg.fids(1, m)-1, 'int32');
